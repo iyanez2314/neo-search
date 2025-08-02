@@ -6,7 +6,11 @@ vim.g.loaded_your_plugin_name = 1
 
 -- Create user commands
 vim.api.nvim_create_user_command("FindAndReplace", function()
-	require("neo-search").find_and_replace()
+	require("neo-search").find_and_replace() -- Live search version
 end, {
 	desc = "Find and replace in current buffer",
 })
+
+vim.keymap.set("n", "<leader>fR", function()
+	require("your-plugin-name").find_and_replace_prompt() -- Command line version
+end, { desc = "Find and Replace (prompt)" })
