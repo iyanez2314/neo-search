@@ -5,8 +5,8 @@ local conf = require("telescope.config").values
 local actions = require("telescope.actions")
 local action_state = require("telescope.actions.state")
 
-local config = require("neo-search.config")
-local utils = require("neo-search.utils")
+local config = require("your-plugin-name.config")
+local utils = require("your-plugin-name.utils")
 
 local M = {}
 
@@ -19,26 +19,20 @@ function M.find_and_replace()
 		return
 	end
 
-	-- Get search term from user
-	local search_term = vim.fn.input("Search for: ")
-	if search_term == "" then
-		return
-	end
-
-	-- Search for matches in current buffer
-	local results = utils.search_in_buffer(search_term, config.options.search)
-
-	if #results == 0 then
-		utils.notify("No matches found for: " .. search_term, vim.log.levels.WARN)
-		return
-	end
-
-	-- Create telescope picker
+	-- Create telescope picker that accepts live input
 	pickers
 		.new(config.options.telescope, {
-			prompt_title = "Find & Replace in Buffer: " .. search_term .. " (" .. #results .. " matches)",
-			finder = finders.new_table({
-				results = results,
+			prompt_title = "Find & Replace in Buffer",
+			finder = finders.new_dynamic({
+				fn = function(prompt)
+					if prompt == "" then
+						return {}
+					end
+
+					-- Search for matches in current buffer
+					local results = utils.search_in_buffer(prompt, config.options.search)
+					return results
+				end,
 				entry_maker = function(entry)
 					return {
 						value = entry,
@@ -51,6 +45,9 @@ function M.find_and_replace()
 			attach_mappings = function(prompt_bufnr, map)
 				-- Default action: go to match location
 				actions.select_default:replace(function()
+					local current_picker = action_state.get_current_picker(prompt_bufnr)
+					local prompt = current_picker:_get_prompt()
+
 					actions.close(prompt_bufnr)
 					local selection = action_state.get_selected_entry()
 					if selection then
@@ -62,19 +59,29 @@ function M.find_and_replace()
 
 				-- Custom action: replace this match
 				map("i", "<C-r>", function()
+					local current_picker = action_state.get_current_picker(prompt_bufnr)
+					local search_term = current_picker:_get_prompt()
 					M.replace_single_match(prompt_bufnr, search_term)
 				end)
 
 				map("n", "<C-r>", function()
+					local current_picker = action_state.get_current_picker(prompt_bufnr)
+					local search_term = current_picker:_get_prompt()
 					M.replace_single_match(prompt_bufnr, search_term)
 				end)
 
 				-- Custom action: replace all matches
 				map("i", "<C-a>", function()
+					local current_picker = action_state.get_current_picker(prompt_bufnr)
+					local search_term = current_picker:_get_prompt()
+					local results = utils.search_in_buffer(search_term, config.options.search)
 					M.replace_all_matches(prompt_bufnr, search_term, results)
 				end)
 
 				map("n", "<C-a>", function()
+					local current_picker = action_state.get_current_picker(prompt_bufnr)
+					local search_term = current_picker:_get_prompt()
+					local results = utils.search_in_buffer(search_term, config.options.search)
 					M.replace_all_matches(prompt_bufnr, search_term, results)
 				end)
 
