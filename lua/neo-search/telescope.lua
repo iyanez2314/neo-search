@@ -35,47 +35,49 @@ function M.find_and_replace()
 	end
 
 	-- Create telescope picker with all results
-	pickers.new(config.options.telescope, {
-		prompt_title = "Find & Replace: " .. search_term .. " (" .. #results .. " matches)",
-		finder = finders.new_table({
-			results = results,
-			entry_maker = function(entry)
-				return {
-					value = entry,
-					display = entry.display,
-					ordinal = entry.display,
-				}
+	pickers
+		.new(config.options.telescope, {
+			prompt_title = "Find & Replace: " .. search_term .. " (" .. #results .. " matches)",
+			finder = finders.new_table({
+				results = results,
+				entry_maker = function(entry)
+					return {
+						value = entry,
+						display = entry.display,
+						ordinal = entry.display,
+					}
+				end,
+			}),
+			sorter = conf.generic_sorter(config.options.telescope),
+			previewer = false,
+			attach_mappings = function(prompt_bufnr, map)
+				-- Navigate to match
+				actions.select_default:replace(function()
+					local selection = action_state.get_selected_entry()
+					if selection and selection.value and selection.value.lnum then
+						actions.close(prompt_bufnr)
+						vim.api.nvim_win_set_cursor(0, { selection.value.lnum, selection.value.col - 1 })
+						M.highlight_match(selection.value)
+					end
+				end)
+
+				-- Replace single match
+				map("i", "<C-r>", function()
+					local selection = action_state.get_selected_entry()
+					if selection and selection.value and selection.value.lnum then
+						M.replace_single_match(prompt_bufnr, search_term, selection.value)
+					end
+				end)
+
+				-- Replace all matches
+				map("i", "<C-a>", function()
+					M.replace_all_matches(prompt_bufnr, search_term, results)
+				end)
+
+				return true
 			end,
-		}),
-		sorter = conf.generic_sorter(config.options.telescope),
-		previewer = false,
-		attach_mappings = function(prompt_bufnr, map)
-			-- Navigate to match
-			actions.select_default:replace(function()
-				local selection = action_state.get_selected_entry()
-				if selection and selection.value and selection.value.lnum then
-					actions.close(prompt_bufnr)
-					vim.api.nvim_win_set_cursor(0, { selection.value.lnum, selection.value.col - 1 })
-					M.highlight_match(selection.value)
-				end
-			end)
-
-			-- Replace single match
-			map("i", "<C-r>", function()
-				local selection = action_state.get_selected_entry()
-				if selection and selection.value and selection.value.lnum then
-					M.replace_single_match(prompt_bufnr, search_term, selection.value)
-				end
-			end)
-
-			-- Replace all matches  
-			map("i", "<C-a>", function()
-				M.replace_all_matches(prompt_bufnr, search_term, results)
-			end)
-
-			return true
-		end,
-	}):find()
+		})
+		:find()
 end
 
 -- Simple debug version of find and replace
@@ -142,7 +144,7 @@ function M.highlight_match(match_info)
 	if not match_info or not match_info.bufnr then
 		return
 	end
-	
+
 	-- Check if buffer is valid
 	if not vim.api.nvim_buf_is_valid(match_info.bufnr) then
 		return
@@ -193,13 +195,7 @@ function M.replace_single_match(prompt_bufnr, search_term, selected_match)
 	end
 
 	-- Perform replacement
-	local success, message = utils.replace_in_buffer(
-		match.bufnr,
-		match.lnum,
-		match.col,
-		match.end_col,
-		replace_text
-	)
+	local success, message = utils.replace_in_buffer(match.bufnr, match.lnum, match.col, match.end_col, replace_text)
 
 	if success then
 		utils.notify("Replaced 1 occurrence")
