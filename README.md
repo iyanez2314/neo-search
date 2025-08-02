@@ -10,7 +10,7 @@
 ```
 
 > **A powerful, telescope-powered find and replace plugin for Neovim**  
-> *Fast • Intuitive • Precise*
+> _Fast • Intuitive • Precise_
 
 ## ✨ Features
 
@@ -27,7 +27,7 @@
 
 ```lua
 {
-  "your-username/neo-search", -- Replace with your actual repo
+  "iyanez2314/neo-search",
   dependencies = {
     "nvim-telescope/telescope.nvim",
     "nvim-lua/plenary.nvim"
@@ -47,7 +47,7 @@
 
 ```lua
 use {
-  "your-username/neo-search", -- Replace with your actual repo
+  "iyanez2314/neo-search",
   requires = {
     "nvim-telescope/telescope.nvim",
     "nvim-lua/plenary.nvim"
@@ -70,12 +70,12 @@ use {
 
 ## 🎮 Keybindings
 
-| Key | Action |
-|-----|--------|
-| `<leader>fr` | Open find and replace |
-| `<Enter>` | Jump to selected match |
-| `<C-r>` | Replace selected match |
-| `<C-a>` | Replace all matches |
+| Key          | Action                 |
+| ------------ | ---------------------- |
+| `<leader>fr` | Open find and replace  |
+| `<Enter>`    | Jump to selected match |
+| `<C-r>`      | Replace selected match |
+| `<C-a>`      | Replace all matches    |
 
 ## 🛠️ Configuration
 
@@ -89,7 +89,7 @@ require("neo-search").setup({
       height = 0.6,
     },
   },
-  
+
   -- Search options
   search = {
     case_sensitive = false,  -- Case-insensitive search by default
@@ -101,21 +101,23 @@ require("neo-search").setup({
 
 ## 📋 Commands
 
-| Command | Description |
-|---------|-------------|
-| `:FindAndReplace` | Open find and replace interface |
-| `:FAR` | Alias for FindAndReplace |
-| `:TestSearch` | Debug command to test search functionality |
+| Command           | Description                                |
+| ----------------- | ------------------------------------------ |
+| `:FindAndReplace` | Open find and replace interface            |
+| `:FAR`            | Alias for FindAndReplace                   |
+| `:TestSearch`     | Debug command to test search functionality |
 
 ## 🎯 Use Cases
 
 ### Perfect for:
+
 - 🔧 **Refactoring** - Rename variables, functions, or classes
 - 📝 **Content Editing** - Replace repeated text patterns
 - 🐛 **Bug Fixing** - Find and fix specific code patterns
 - 🧹 **Code Cleanup** - Remove or replace deprecated code
 
 ### Example Workflow:
+
 1. Press `<leader>fr`
 2. Search for `oldFunctionName`
 3. See all 15 occurrences across your file
@@ -130,12 +132,14 @@ Neo-search leverages the power of Telescope to provide a smooth find and replace
 3. **Action Phase**: Perform targeted replacements with visual feedback
 
 ### Match Display Format:
+
 ```
 Line 42 Col 15: [local] config = require("config")
-Line 58 Col 8:  function [local]_helper() 
+Line 58 Col 8:  function [local]_helper()
 ```
 
 Each match shows:
+
 - Line number and column position
 - Highlighted match in brackets `[match]`
 - Surrounding context for clarity
@@ -143,8 +147,9 @@ Each match shows:
 ## 🤝 Contributing
 
 Contributions are welcome! Feel free to:
+
 - 🐛 Report bugs
-- 💡 Suggest features  
+- 💡 Suggest features
 - 📖 Improve documentation
 - 🔧 Submit pull requests
 
@@ -164,6 +169,7 @@ MIT License - see LICENSE file for details
 
 **Made with ❤️ for the Neovim community**
 
-*Happy searching! 🔍*
+_Happy searching! 🔍_
 
 </div>
+
