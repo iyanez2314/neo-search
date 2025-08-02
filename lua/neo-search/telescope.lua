@@ -19,20 +19,11 @@ function M.find_and_replace()
 		return
 	end
 
-	local current_search = ""
 	local current_results = {}
-
-	-- Dynamic finder that updates based on user input
-	local dynamic_finder = finders.new_dynamic({
-		fn = function(prompt)
-			if prompt == "" or prompt == current_search then
-				return current_results
-			end
-			
-			current_search = prompt
-			current_results = utils.search_in_buffer(prompt, config.options.search)
-			return current_results
-		end,
+	
+	-- Start with empty results
+	local initial_finder = finders.new_table({
+		results = {},
 		entry_maker = function(entry)
 			return {
 				value = entry,
@@ -43,45 +34,72 @@ function M.find_and_replace()
 	})
 
 	-- Create telescope picker with live search
-	pickers
-		.new(config.options.telescope, {
-			prompt_title = "Find & Replace (type to search)",
-			finder = dynamic_finder,
-			sorter = conf.generic_sorter(config.options.telescope),
-			attach_mappings = function(prompt_bufnr, map)
-				-- Navigate to match
-				actions.select_default:replace(function()
-					local selection = action_state.get_selected_entry()
-					if selection then
-						actions.close(prompt_bufnr)
-						vim.api.nvim_win_set_cursor(0, { selection.value.lnum, selection.value.col - 1 })
-						M.highlight_match(selection.value)
-					end
-				end)
+	local picker = pickers.new(config.options.telescope, {
+		prompt_title = "Find & Replace (type to search)",
+		finder = initial_finder,
+		sorter = conf.generic_sorter(config.options.telescope),
+		attach_mappings = function(prompt_bufnr, map)
+			-- Navigate to match
+			actions.select_default:replace(function()
+				local selection = action_state.get_selected_entry()
+				if selection and selection.value and selection.value.lnum then
+					actions.close(prompt_bufnr)
+					vim.api.nvim_win_set_cursor(0, { selection.value.lnum, selection.value.col - 1 })
+					M.highlight_match(selection.value)
+				end
+			end)
 
-				-- Replace single match
-				map("i", "<C-r>", function()
-					local prompt_value = action_state.get_current_line()
-					if prompt_value and prompt_value ~= "" then
-						M.replace_single_match(prompt_bufnr, prompt_value)
-					end
-				end)
+			-- Replace single match
+			map("i", "<C-r>", function()
+				local prompt_value = action_state.get_current_line()
+				if prompt_value and prompt_value ~= "" and #current_results > 0 then
+					M.replace_single_match(prompt_bufnr, prompt_value)
+				end
+			end)
 
-				-- Replace all matches
-				map("i", "<C-a>", function()
-					local prompt_value = action_state.get_current_line()
-					if prompt_value and prompt_value ~= "" then
-						local results = utils.search_in_buffer(prompt_value, config.options.search)
-						if #results > 0 then
-							M.replace_all_matches(prompt_bufnr, prompt_value, results)
-						end
-					end
-				end)
+			-- Replace all matches
+			map("i", "<C-a>", function()
+				local prompt_value = action_state.get_current_line()
+				if prompt_value and prompt_value ~= "" and #current_results > 0 then
+					M.replace_all_matches(prompt_bufnr, prompt_value, current_results)
+				end
+			end)
 
-				return true
-			end,
-		})
-		:find()
+			return true
+		end,
+	})
+
+	-- Set up live update on prompt change
+	local original_on_input_filter_cb = picker.finder.on_input_filter_cb or function() end
+	picker.finder.on_input_filter_cb = function(prompt)
+		-- Update results when user types
+		if prompt and prompt ~= "" then
+			current_results = utils.search_in_buffer(prompt, config.options.search)
+			
+			-- Update the finder with new results
+			picker:refresh(finders.new_table({
+				results = current_results,
+				entry_maker = function(entry)
+					return {
+						value = entry,
+						display = entry.display,
+						ordinal = entry.display,
+					}
+				end,
+			}), { reset_prompt = false })
+		else
+			current_results = {}
+			picker:refresh(finders.new_table({
+				results = {},
+				entry_maker = function(entry) return { value = entry, display = "", ordinal = "" } end,
+			}), { reset_prompt = false })
+		end
+		
+		-- Call original callback if it exists
+		return original_on_input_filter_cb(prompt)
+	end
+
+	picker:find()
 end
 
 -- Simple debug version of find and replace
@@ -144,6 +162,16 @@ end
 
 -- Highlight a match temporarily
 function M.highlight_match(match_info)
+	-- Validate buffer exists and is valid
+	if not match_info or not match_info.bufnr then
+		return
+	end
+	
+	-- Check if buffer is valid
+	if not vim.api.nvim_buf_is_valid(match_info.bufnr) then
+		return
+	end
+
 	local ns_id = vim.api.nvim_create_namespace("find_replace_highlight")
 
 	-- Clear any existing highlights
@@ -161,7 +189,10 @@ function M.highlight_match(match_info)
 
 	-- Remove highlight after 2 seconds
 	vim.defer_fn(function()
-		vim.api.nvim_buf_clear_namespace(match_info.bufnr, ns_id, 0, -1)
+		-- Check again if buffer is still valid before clearing
+		if vim.api.nvim_buf_is_valid(match_info.bufnr) then
+			vim.api.nvim_buf_clear_namespace(match_info.bufnr, ns_id, 0, -1)
+		end
 	end, 2000)
 end
 
