@@ -25,7 +25,7 @@ M.options = {}
 function M.setup(user_opts)
 	-- Deep merge user options with defaults
 	local function deep_merge(target, source)
-		for key, value in pairs(soruce) do
+		for key, value in pairs(source) do
 			if type(value) == "table" and type(target[key]) == "table" then
 				deep_merge(target[key], value)
 			else
