@@ -10,6 +10,72 @@ local utils = require("neo-search.utils")
 
 local M = {}
 
+-- Main find and replace function
+function M.find_and_replace()
+	-- Check if buffer is modifiable
+	local bufnr = vim.api.nvim_get_current_buf()
+	if not vim.api.nvim_buf_get_option(bufnr, "modifiable") then
+		utils.notify("Buffer is not modifiable", vim.log.levels.WARN)
+		return
+	end
+
+	-- Get search term from user
+	local search_term = vim.fn.input("Search for: ")
+	if search_term == "" then
+		utils.notify("No search term provided", vim.log.levels.WARN)
+		return
+	end
+
+	-- Search for matches in current buffer
+	local results = utils.search_in_buffer(search_term, config.options.search)
+
+	if #results == 0 then
+		utils.notify("No matches found for: " .. search_term, vim.log.levels.WARN)
+		return
+	end
+
+	-- Create telescope picker with live find and replace capabilities
+	pickers
+		.new(config.options.telescope, {
+			prompt_title = "Find & Replace: " .. search_term .. " (" .. #results .. " matches)",
+			finder = finders.new_table({
+				results = results,
+				entry_maker = function(entry)
+					return {
+						value = entry,
+						display = entry.display,
+						ordinal = entry.display,
+					}
+				end,
+			}),
+			sorter = conf.generic_sorter(config.options.telescope),
+			attach_mappings = function(prompt_bufnr, map)
+				-- Preview/navigate to match
+				actions.select_default:replace(function()
+					actions.close(prompt_bufnr)
+					local selection = action_state.get_selected_entry()
+					if selection then
+						vim.api.nvim_win_set_cursor(0, { selection.value.lnum, selection.value.col - 1 })
+						M.highlight_match(selection.value)
+					end
+				end)
+
+				-- Replace single match
+				map("i", "<C-r>", function()
+					M.replace_single_match(prompt_bufnr, search_term)
+				end)
+
+				-- Replace all matches
+				map("i", "<C-a>", function()
+					M.replace_all_matches(prompt_bufnr, search_term, results)
+				end)
+
+				return true
+			end,
+		})
+		:find()
+end
+
 -- Simple debug version of find and replace
 function M.find_and_replace_debug()
 	-- Check if buffer is modifiable
