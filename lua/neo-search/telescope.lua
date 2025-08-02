@@ -5,8 +5,8 @@ local conf = require("telescope.config").values
 local actions = require("telescope.actions")
 local action_state = require("telescope.actions.state")
 
-local config = require("your-plugin-name.config")
-local utils = require("your-plugin-name.utils")
+local config = require("neo-search.config")
+local utils = require("neo-search.utils")
 
 local M = {}
 
