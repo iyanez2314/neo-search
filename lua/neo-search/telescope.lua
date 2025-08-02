@@ -22,57 +22,22 @@ function M.find_and_replace()
 	local current_results = {}
 	local current_search = ""
 	
-	-- Use async job finder for live updates
-	local live_finder = finders.new_async_job({
-		command_generator = function(prompt)
-			current_search = prompt
-			if prompt == "" then
-				current_results = {}
-				-- Return a command that outputs nothing
-				return { "echo", "" }
-			end
-			
-			-- Search in current buffer and store results
-			current_results = utils.search_in_buffer(prompt, config.options.search)
-			
-			-- Create output for telescope
-			local lines = {}
-			for _, result in ipairs(current_results) do
-				table.insert(lines, result.display)
-			end
-			
-			if #lines > 0 then
-				-- Use printf to output all lines
-				return { "printf", table.concat(lines, "\\n") }
-			else
-				return { "echo", "" }
-			end
-		end,
-		entry_maker = function(line)
-			-- Find the corresponding result for this display line
-			for _, result in ipairs(current_results) do
-				if result.display == line then
-					return {
-						value = result,
-						display = result.display,
-						ordinal = result.display,
-					}
-				end
-			end
-			-- Fallback
+	-- Start with empty table finder
+	local finder = finders.new_table({
+		results = {},
+		entry_maker = function(entry)
 			return {
-				value = { display = line },
-				display = line,
-				ordinal = line,
+				value = entry,
+				display = entry.display,
+				ordinal = entry.display,
 			}
 		end,
-		cwd = vim.fn.getcwd(),
 	})
 
-	-- Create telescope picker with live search
-	pickers.new(config.options.telescope, {
+	-- Create telescope picker
+	local picker = pickers.new(config.options.telescope, {
 		prompt_title = "Find & Replace (type to search)",
-		finder = live_finder,
+		finder = finder,
 		sorter = conf.generic_sorter(config.options.telescope),
 		previewer = false,
 		attach_mappings = function(prompt_bufnr, map)
@@ -103,7 +68,59 @@ function M.find_and_replace()
 
 			return true
 		end,
-	}):find()
+	})
+
+	-- Override the on_input_filter_cb to update results
+	local original_on_input_filter_cb = picker._completion_callbacks
+	
+	-- Set up a timer to handle input changes
+	local timer = vim.loop.new_timer()
+	local last_prompt = ""
+	
+	-- Function to update results
+	local function update_results(prompt)
+		if prompt == last_prompt then
+			return
+		end
+		
+		last_prompt = prompt
+		current_search = prompt
+		
+		if prompt == "" then
+			current_results = {}
+		else
+			current_results = utils.search_in_buffer(prompt, config.options.search)
+		end
+		
+		-- Update picker with new results
+		picker:refresh(
+			finders.new_table({
+				results = current_results,
+				entry_maker = function(entry)
+					return {
+						value = entry,
+						display = entry.display,
+						ordinal = entry.display,
+					}
+				end,
+			}),
+			{ reset_prompt = false }
+		)
+	end
+	
+	-- Hook into telescope's input handling
+	vim.api.nvim_create_autocmd("TextChangedI", {
+		buffer = picker.prompt_bufnr,
+		callback = function()
+			timer:stop()
+			timer:start(100, 0, vim.schedule_wrap(function()
+				local prompt = action_state.get_current_line()
+				update_results(prompt)
+			end))
+		end,
+	})
+
+	picker:find()
 end
 
 -- Simple debug version of find and replace
