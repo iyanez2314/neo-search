@@ -54,6 +54,12 @@ function M.search_in_buffer(search_term, search_opts)
         end
       end
       
+      -- Create display with highlighted match
+      local clean_line = line:gsub("^%s+", "")
+      local match_text = line:sub(match_start, match_end)
+      local before_match = line:sub(1, match_start - 1):gsub("^%s+", "")
+      local after_match = line:sub(match_end + 1)
+      
       -- Use original line for display and actual positions
       table.insert(results, {
         bufnr = bufnr,
@@ -62,8 +68,9 @@ function M.search_in_buffer(search_term, search_opts)
         col = match_start,
         end_col = match_end,
         text = line,
-        match_text = line:sub(match_start, match_end),
-        display = string.format("Line %d: %s", lnum, line:gsub("^%s+", ""))
+        match_text = match_text,
+        display = string.format("Line %d Col %d: %s[%s]%s", 
+          lnum, match_start, before_match, match_text, after_match)
       })
       
       print("Found match at line", lnum, "col", match_start) -- Debug
