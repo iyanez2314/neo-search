@@ -20,28 +20,53 @@ function M.find_and_replace()
 	end
 
 	local current_results = {}
+	local current_search = ""
 	
-	-- Use dynamic finder that updates on each input
-	local live_finder = finders.new_dynamic({
-		fn = function(prompt)
+	-- Use async job finder for live updates
+	local live_finder = finders.new_async_job({
+		command_generator = function(prompt)
+			current_search = prompt
 			if prompt == "" then
 				current_results = {}
-				return {}
+				-- Return a command that outputs nothing
+				return { "echo", "" }
 			end
 			
-			-- Search in current buffer
+			-- Search in current buffer and store results
 			current_results = utils.search_in_buffer(prompt, config.options.search)
-			return current_results
+			
+			-- Create output for telescope
+			local lines = {}
+			for _, result in ipairs(current_results) do
+				table.insert(lines, result.display)
+			end
+			
+			if #lines > 0 then
+				-- Use printf to output all lines
+				return { "printf", table.concat(lines, "\\n") }
+			else
+				return { "echo", "" }
+			end
 		end,
-		entry_maker = function(entry)
+		entry_maker = function(line)
+			-- Find the corresponding result for this display line
+			for _, result in ipairs(current_results) do
+				if result.display == line then
+					return {
+						value = result,
+						display = result.display,
+						ordinal = result.display,
+					}
+				end
+			end
+			-- Fallback
 			return {
-				value = entry,
-				display = entry.display,
-				ordinal = entry.display,
-				lnum = entry.lnum,
-				col = entry.col,
+				value = { display = line },
+				display = line,
+				ordinal = line,
 			}
 		end,
+		cwd = vim.fn.getcwd(),
 	})
 
 	-- Create telescope picker with live search
@@ -49,7 +74,7 @@ function M.find_and_replace()
 		prompt_title = "Find & Replace (type to search)",
 		finder = live_finder,
 		sorter = conf.generic_sorter(config.options.telescope),
-		previewer = false, -- Disable previewer for now to focus on the main functionality
+		previewer = false,
 		attach_mappings = function(prompt_bufnr, map)
 			-- Navigate to match
 			actions.select_default:replace(function()
@@ -64,17 +89,15 @@ function M.find_and_replace()
 			-- Replace single match
 			map("i", "<C-r>", function()
 				local selection = action_state.get_selected_entry()
-				if selection and selection.value then
-					local prompt_value = action_state.get_current_line()
-					M.replace_single_match(prompt_bufnr, prompt_value, selection.value)
+				if selection and selection.value and selection.value.lnum then
+					M.replace_single_match(prompt_bufnr, current_search, selection.value)
 				end
 			end)
 
 			-- Replace all matches
 			map("i", "<C-a>", function()
-				local prompt_value = action_state.get_current_line()
-				if prompt_value and prompt_value ~= "" and #current_results > 0 then
-					M.replace_all_matches(prompt_bufnr, prompt_value, current_results)
+				if current_search ~= "" and #current_results > 0 then
+					M.replace_all_matches(prompt_bufnr, current_search, current_results)
 				end
 			end)
 
