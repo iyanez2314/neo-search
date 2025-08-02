@@ -10,7 +10,3 @@ vim.api.nvim_create_user_command("FindAndReplace", function()
 end, {
 	desc = "Find and replace in current buffer",
 })
-
-vim.keymap.set("n", "<leader>fR", function()
-	require("neo-search").find_and_replace_prompt() -- Command line version
-end, { desc = "Find and Replace (prompt)" })
