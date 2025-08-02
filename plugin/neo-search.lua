@@ -12,5 +12,5 @@ end, {
 })
 
 vim.keymap.set("n", "<leader>fR", function()
-	require("your-plugin-name").find_and_replace_prompt() -- Command line version
+	require("neo-search").find_and_replace_prompt() -- Command line version
 end, { desc = "Find and Replace (prompt)" })
