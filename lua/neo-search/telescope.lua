@@ -10,7 +10,7 @@ local utils = require("neo-search.utils")
 
 local M = {}
 
--- Main find and replace function
+-- Main find and replace function with live input
 function M.find_and_replace()
 	-- Check if buffer is modifiable
 	local bufnr = vim.api.nvim_get_current_buf()
@@ -19,42 +19,41 @@ function M.find_and_replace()
 		return
 	end
 
-	-- Get search term from user
-	local search_term = vim.fn.input("Search for: ")
-	if search_term == "" then
-		utils.notify("No search term provided", vim.log.levels.WARN)
-		return
-	end
+	local current_search = ""
+	local current_results = {}
 
-	-- Search for matches in current buffer
-	local results = utils.search_in_buffer(search_term, config.options.search)
+	-- Dynamic finder that updates based on user input
+	local dynamic_finder = finders.new_dynamic({
+		fn = function(prompt)
+			if prompt == "" or prompt == current_search then
+				return current_results
+			end
+			
+			current_search = prompt
+			current_results = utils.search_in_buffer(prompt, config.options.search)
+			return current_results
+		end,
+		entry_maker = function(entry)
+			return {
+				value = entry,
+				display = entry.display,
+				ordinal = entry.display,
+			}
+		end,
+	})
 
-	if #results == 0 then
-		utils.notify("No matches found for: " .. search_term, vim.log.levels.WARN)
-		return
-	end
-
-	-- Create telescope picker with live find and replace capabilities
+	-- Create telescope picker with live search
 	pickers
 		.new(config.options.telescope, {
-			prompt_title = "Find & Replace: " .. search_term .. " (" .. #results .. " matches)",
-			finder = finders.new_table({
-				results = results,
-				entry_maker = function(entry)
-					return {
-						value = entry,
-						display = entry.display,
-						ordinal = entry.display,
-					}
-				end,
-			}),
+			prompt_title = "Find & Replace (type to search)",
+			finder = dynamic_finder,
 			sorter = conf.generic_sorter(config.options.telescope),
 			attach_mappings = function(prompt_bufnr, map)
-				-- Preview/navigate to match
+				-- Navigate to match
 				actions.select_default:replace(function()
-					actions.close(prompt_bufnr)
 					local selection = action_state.get_selected_entry()
 					if selection then
+						actions.close(prompt_bufnr)
 						vim.api.nvim_win_set_cursor(0, { selection.value.lnum, selection.value.col - 1 })
 						M.highlight_match(selection.value)
 					end
@@ -62,12 +61,21 @@ function M.find_and_replace()
 
 				-- Replace single match
 				map("i", "<C-r>", function()
-					M.replace_single_match(prompt_bufnr, search_term)
+					local prompt_value = action_state.get_current_line()
+					if prompt_value and prompt_value ~= "" then
+						M.replace_single_match(prompt_bufnr, prompt_value)
+					end
 				end)
 
 				-- Replace all matches
 				map("i", "<C-a>", function()
-					M.replace_all_matches(prompt_bufnr, search_term, results)
+					local prompt_value = action_state.get_current_line()
+					if prompt_value and prompt_value ~= "" then
+						local results = utils.search_in_buffer(prompt_value, config.options.search)
+						if #results > 0 then
+							M.replace_all_matches(prompt_bufnr, prompt_value, results)
+						end
+					end
 				end)
 
 				return true
