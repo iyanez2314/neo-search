@@ -21,23 +21,35 @@ function M.find_and_replace()
 
 	local current_results = {}
 	
-	-- Start with empty results
-	local initial_finder = finders.new_table({
-		results = {},
+	-- Use dynamic finder that updates on each input
+	local live_finder = finders.new_dynamic({
+		fn = function(prompt)
+			if prompt == "" then
+				current_results = {}
+				return {}
+			end
+			
+			-- Search in current buffer
+			current_results = utils.search_in_buffer(prompt, config.options.search)
+			return current_results
+		end,
 		entry_maker = function(entry)
 			return {
 				value = entry,
 				display = entry.display,
 				ordinal = entry.display,
+				lnum = entry.lnum,
+				col = entry.col,
 			}
 		end,
 	})
 
 	-- Create telescope picker with live search
-	local picker = pickers.new(config.options.telescope, {
+	pickers.new(config.options.telescope, {
 		prompt_title = "Find & Replace (type to search)",
-		finder = initial_finder,
+		finder = live_finder,
 		sorter = conf.generic_sorter(config.options.telescope),
+		previewer = false, -- Disable previewer for now to focus on the main functionality
 		attach_mappings = function(prompt_bufnr, map)
 			-- Navigate to match
 			actions.select_default:replace(function()
@@ -51,9 +63,10 @@ function M.find_and_replace()
 
 			-- Replace single match
 			map("i", "<C-r>", function()
-				local prompt_value = action_state.get_current_line()
-				if prompt_value and prompt_value ~= "" and #current_results > 0 then
-					M.replace_single_match(prompt_bufnr, prompt_value)
+				local selection = action_state.get_selected_entry()
+				if selection and selection.value then
+					local prompt_value = action_state.get_current_line()
+					M.replace_single_match(prompt_bufnr, prompt_value, selection.value)
 				end
 			end)
 
@@ -67,39 +80,7 @@ function M.find_and_replace()
 
 			return true
 		end,
-	})
-
-	-- Set up live update on prompt change
-	local original_on_input_filter_cb = picker.finder.on_input_filter_cb or function() end
-	picker.finder.on_input_filter_cb = function(prompt)
-		-- Update results when user types
-		if prompt and prompt ~= "" then
-			current_results = utils.search_in_buffer(prompt, config.options.search)
-			
-			-- Update the finder with new results
-			picker:refresh(finders.new_table({
-				results = current_results,
-				entry_maker = function(entry)
-					return {
-						value = entry,
-						display = entry.display,
-						ordinal = entry.display,
-					}
-				end,
-			}), { reset_prompt = false })
-		else
-			current_results = {}
-			picker:refresh(finders.new_table({
-				results = {},
-				entry_maker = function(entry) return { value = entry, display = "", ordinal = "" } end,
-			}), { reset_prompt = false })
-		end
-		
-		-- Call original callback if it exists
-		return original_on_input_filter_cb(prompt)
-	end
-
-	picker:find()
+	}):find()
 end
 
 -- Simple debug version of find and replace
@@ -197,10 +178,15 @@ function M.highlight_match(match_info)
 end
 
 -- Replace single match
-function M.replace_single_match(prompt_bufnr, search_term)
-	local selection = action_state.get_selected_entry()
-	if not selection then
-		return
+function M.replace_single_match(prompt_bufnr, search_term, selected_match)
+	-- Use provided match or get from current selection
+	local match = selected_match
+	if not match then
+		local selection = action_state.get_selected_entry()
+		if not selection then
+			return
+		end
+		match = selection.value
 	end
 
 	actions.close(prompt_bufnr)
@@ -213,17 +199,17 @@ function M.replace_single_match(prompt_bufnr, search_term)
 
 	-- Perform replacement
 	local success, message = utils.replace_in_buffer(
-		selection.value.bufnr,
-		selection.value.lnum,
-		selection.value.col,
-		selection.value.end_col,
+		match.bufnr,
+		match.lnum,
+		match.col,
+		match.end_col,
 		replace_text
 	)
 
 	if success then
 		utils.notify("Replaced 1 occurrence")
 		-- Move cursor to the replacement
-		vim.api.nvim_win_set_cursor(0, { selection.value.lnum, selection.value.col - 1 })
+		vim.api.nvim_win_set_cursor(0, { match.lnum, match.col - 1 })
 	else
 		utils.notify(message, vim.log.levels.ERROR)
 	end
