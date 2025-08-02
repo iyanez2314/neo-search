@@ -7,6 +7,10 @@ function M.search_in_buffer(search_term, search_opts)
   local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
   local filename = vim.api.nvim_buf_get_name(bufnr)
   
+  -- Debug: Print what we're searching for
+  print("Searching for:", search_term)
+  print("Total lines:", #lines)
+  
   -- If buffer has no name, use a placeholder
   if filename == "" then
     filename = "[No Name]"
@@ -15,27 +19,25 @@ function M.search_in_buffer(search_term, search_opts)
   end
   
   for lnum, line in ipairs(lines) do
+    -- Simple case-insensitive search for now (we'll fix the complex logic)
     local search_pattern = search_term
+    local search_line = line
     
-    -- Handle search options
-    if not search_opts.use_regex then
-      search_pattern = M.escape_pattern(search_term)
+    -- Handle case sensitivity
+    if not search_opts.case_sensitive then
+      search_pattern = search_pattern:lower()
+      search_line = line:lower()
     end
     
-    if not search_opts.case_sensitive then
-      search_pattern = "(?i)" .. search_pattern
+    -- Escape pattern for literal search
+    if not search_opts.use_regex then
+      search_pattern = M.escape_pattern(search_pattern)
     end
     
     -- Find all matches in the line
     local start_pos = 1
     while true do
-      local match_start, match_end
-      
-      if search_opts.case_sensitive then
-        match_start, match_end = line:find(search_pattern, start_pos, not search_opts.use_regex)
-      else
-        match_start, match_end = line:lower():find(search_pattern:lower(), start_pos, not search_opts.use_regex)
-      end
+      local match_start, match_end = search_line:find(search_pattern, start_pos, not search_opts.use_regex)
       
       if not match_start then
         break
@@ -52,6 +54,7 @@ function M.search_in_buffer(search_term, search_opts)
         end
       end
       
+      -- Use original line for display and actual positions
       table.insert(results, {
         bufnr = bufnr,
         filename = filename,
@@ -63,11 +66,14 @@ function M.search_in_buffer(search_term, search_opts)
         display = string.format("Line %d: %s", lnum, line:gsub("^%s+", ""))
       })
       
+      print("Found match at line", lnum, "col", match_start) -- Debug
+      
       start_pos = match_start + 1
       ::continue::
     end
   end
   
+  print("Total results found:", #results) -- Debug
   return results
 end
 

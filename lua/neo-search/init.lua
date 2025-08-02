@@ -4,17 +4,23 @@ local telescope = require("neo-search.telescope")
 
 local M = {}
 
--- Plugin Setup Function
+-- Plugin setup function
 function M.setup(opts)
-	-- Merge the user options with the default config
+	-- Merge user options with defaults
 	config.setup(opts or {})
 
-	telescope.setup()
+	-- Register telescope extension
+	telescope_extension.setup()
 end
 
--- Main find and replace funtion
+-- Main find and replace function
 function M.find_and_replace()
-	telescope.find_and_replace()
+	telescope_extension.find_and_replace()
+end
+
+-- Debug version
+function M.find_and_replace_debug()
+	telescope_extension.find_and_replace_debug()
 end
 
 -- Export the module
