@@ -10,17 +10,17 @@ function M.setup(opts)
 	config.setup(opts or {})
 
 	-- Register telescope extension
-	telescope_extension.setup()
+	telescope.setup()
 end
 
 -- Main find and replace function
 function M.find_and_replace()
-	telescope_extension.find_and_replace()
+	telescope.find_and_replace()
 end
 
 -- Debug version
 function M.find_and_replace_debug()
-	telescope_extension.find_and_replace_debug()
+	telescope.find_and_replace_debug()
 end
 
 -- Export the module
