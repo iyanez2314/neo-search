@@ -10,3 +10,9 @@ vim.api.nvim_create_user_command("FindAndReplace", function()
 end, {
 	desc = "Find and replace in current buffer",
 })
+
+vim.api.nvim_create_user_command("FAR", function()
+	require("neo-search").find_and_replace()
+end, {
+	desc = "Find and replace in current buffer (alias)",
+})
